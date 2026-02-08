@@ -402,7 +402,7 @@ report(df)
 
 ### 1/7/2018
 
-- Added Gymnasium support, use `gym.make('simglucose-v0')` to make the environment.
+- Added OpenAI gym support, use `gym.make('simglucose-v0')` to make the environment.
 - Noticed issue: the patient name selection is not available in gym.make for now. The patient name has to be hard-coded in the constructor of `simglucose.envs.T1DSimEnv`.
 
 ## Reporting issues
