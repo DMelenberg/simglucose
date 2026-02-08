@@ -58,7 +58,10 @@ class T1DSimEnv(gym.Env):
 
     def _step(self, action: float):
         # This gym only controls basal insulin
-        action_value = float(np.asarray(action).item())
+        action_array = np.asarray(action)
+        if action_array.size != 1:
+            raise ValueError("Expected action to contain a single value.")
+        action_value = float(action_array.reshape(-1)[0])
         act = Action(basal=action_value, bolus=0)
         if self.reward_fun is None:
             return self.env.step(act)
