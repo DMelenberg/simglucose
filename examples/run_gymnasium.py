@@ -1,4 +1,4 @@
-import gymnasium
+import gymnasium as gym
 from gymnasium.envs.registration import register
 
 register(
@@ -8,7 +8,7 @@ register(
     kwargs={"patient_name": "adolescent#002"},
 )
 
-env = gymnasium.make("simglucose/adolescent2-v0", render_mode="human")
+env = gym.make("simglucose/adolescent2-v0", render_mode="human")
 observation, info = env.reset()
 for t in range(200):
     env.render()

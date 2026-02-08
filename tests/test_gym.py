@@ -1,11 +1,11 @@
-import gym
+import gymnasium as gym
 import unittest
 from simglucose.controller.basal_bolus_ctrller import BBController
 
 
 class TestGym(unittest.TestCase):
     def test_gym_random_agent(self):
-        from gym.envs.registration import register
+        from gymnasium.envs.registration import register
         register(
             id='simglucose-adolescent2-v0',
             entry_point='simglucose.envs:T1DSimEnv',
@@ -16,20 +16,21 @@ class TestGym(unittest.TestCase):
         ctrller = BBController()
 
         reward = 0
-        done = False
+        terminated = False
+        truncated = False
         info = {'sample_time': 3,
                 'patient_name': 'adolescent#002',
                 'meal': 0}
 
-        observation = env.reset()
+        observation, info = env.reset()
         for t in range(200):
-            env.render(mode='human')
+            env.render()
             print(observation)
             # action = env.action_space.sample()
-            ctrl_action = ctrller.policy(observation, reward, done, **info)
+            ctrl_action = ctrller.policy(observation, reward, terminated, **info)
             action = ctrl_action.basal + ctrl_action.bolus
-            observation, reward, done, info = env.step(action)
-            if done:
+            observation, reward, terminated, truncated, info = env.step(action)
+            if terminated or truncated:
                 print("Episode finished after {} timesteps".format(t + 1))
                 break
 

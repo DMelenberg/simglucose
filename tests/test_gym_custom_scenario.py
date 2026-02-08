@@ -1,4 +1,4 @@
-import gym
+import gymnasium as gym
 import unittest
 from simglucose.simulation.scenario import CustomScenario
 from simglucose.controller.basal_bolus_ctrller import BBController
@@ -17,7 +17,9 @@ class TestCustomScenario(unittest.TestCase):
         custom_meal_scenario = CustomScenario(start_time=start_time, scenario=meals)
 
 
-        gym.envs.register(
+        from gymnasium.envs.registration import register
+
+        register(
             id='env-v0',
             entry_point='simglucose.envs:T1DSimEnv',
             kwargs={'patient_name': 'adult#001',
@@ -28,7 +30,8 @@ class TestCustomScenario(unittest.TestCase):
         ctrller = BBController()
 
         reward = 0
-        done = False
+        terminated = False
+        truncated = False
 
         sample_step = env.env.sensor.sample_time
 
@@ -36,13 +39,13 @@ class TestCustomScenario(unittest.TestCase):
                 'patient_name': 'adolescent#002',
                 'meal': 0}
 
-        observation = env.reset()
+        observation, info = env.reset()
         for t in range(61):
-            env.render(mode='human')
+            env.render()
 
-            ctrl_action = ctrller.policy(observation, reward, done, **info)
+            ctrl_action = ctrller.policy(observation, reward, terminated, **info)
             action = ctrl_action.basal + ctrl_action.bolus
-            observation, reward, done, info = env.step(action)
+            observation, reward, terminated, truncated, info = env.step(action)
 
 
             if info["meal"] > 0 and t*sample_step == (meals[current_pos][0]*60):
@@ -50,7 +53,7 @@ class TestCustomScenario(unittest.TestCase):
                 current_pos += 1
 
 
-            if done:
+            if terminated or truncated:
                 print("Episode finished after {} timesteps".format(t + 1))
                 break
 
