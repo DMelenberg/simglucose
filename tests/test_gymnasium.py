@@ -7,7 +7,7 @@ class TestGymnasium(unittest.TestCase):
     def test_gymnasium_random_agent(self):
         register(
             id="simglucose/adolescent2-v0",
-            entry_point="simglucose.envs:T1DSimGymnaisumEnv",
+            entry_point="simglucose.envs:T1DSimGymnasiumEnv",
             max_episode_steps=10,
             kwargs={"patient_name": "adolescent#002"},
         )

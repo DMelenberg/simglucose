@@ -162,7 +162,7 @@ class T1DSimEnv(gym.Env):
         return self.env.sensor
 
 
-class T1DSimGymnaisumEnv(gym.Env):
+class T1DSimGymnasiumEnv(gym.Env):
     metadata = {"render_modes": ["human"], "render_fps": 60}
     MAX_BG = 1000
 
@@ -195,7 +195,7 @@ class T1DSimGymnaisumEnv(gym.Env):
         # For example,
         # register(
         #     id="simglucose/adolescent2-v0",
-        #     entry_point="simglucose.envs:T1DSimGymnaisumEnv",
+        #     entry_point="simglucose.envs:T1DSimGymnasiumEnv",
         #     max_episode_steps=10,
         #     kwargs={"patient_name": "adolescent#002"},
         # )
@@ -213,3 +213,6 @@ class T1DSimGymnaisumEnv(gym.Env):
 
     def close(self):
         self.env.close()
+
+
+T1DSimGymnaisumEnv = T1DSimGymnasiumEnv
