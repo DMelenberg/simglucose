@@ -217,5 +217,3 @@ class T1DSimGymnasiumEnv(gym.Env):
     def close(self):
         self.env.close()
 
-
-T1DSimGymnaisumEnv = T1DSimGymnasiumEnv

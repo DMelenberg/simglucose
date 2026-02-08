@@ -18,10 +18,6 @@ class TestGym(unittest.TestCase):
         reward = 0
         terminated = False
         truncated = False
-        info = {'sample_time': 3,
-                'patient_name': 'adolescent#002',
-                'meal': 0}
-
         observation, info = env.reset()
         for t in range(200):
             env.render()

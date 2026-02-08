@@ -3,6 +3,7 @@
 
 # results foler
 /results/
+/tests/results/
 
 # Setuptools distribution folder.
 /dist/

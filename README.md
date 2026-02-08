@@ -22,7 +22,7 @@ This simulator is a python implementation of the FDA-approved [UVa/Padova Simula
 
 ## Main Features
 
-- Simulation environment follows [Gymnasium](https://github.com/Farama-Foundation/Gymnasium) and [rllab](https://github.com/rll/rllab) APIs. It returns observation, reward, done, info at each step, which means the simulator is "reinforcement-learning-ready".
+- Simulation environment follows [Gymnasium](https://github.com/Farama-Foundation/Gymnasium) and [rllab](https://github.com/rll/rllab) APIs. It returns observation, reward, terminated, truncated, info at each step, which means the simulator is "reinforcement-learning-ready".
 - Supports customized reward function. The reward function is a function of blood glucose measurements in the last hour. By default, the reward at each step is `risk[t-1] - risk[t]`. `risk[t]` is the risk index at time `t` defined in this [paper](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2903980/pdf/dia.2008.0138.pdf).
 - Supports parallel computing. The simulator simulates multiple patients in parallel using [pathos multiprocessing package](https://github.com/uqfoundation/pathos) (you are free to turn parallel off by setting `parallel=False`).
 - The simulator provides a random scenario generator (`from simglucose.simulation.scenario_gen import RandomScenario`) and a customized scenario generator (`from simglucose.simulation.scenario import CustomScenario`). Commandline user-interface will guide you through the scenario settings.
