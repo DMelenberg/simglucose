@@ -398,7 +398,7 @@ report(df)
 
 ### 1/10/2018
 
-- Added workaround to select patient when making a gymnasium environment: register gymnasium environment by passing kwargs of patient_name.
+- Added workaround to select patient when make gym environment: register gym environment by passing kwargs of patient_name.
 
 ### 1/7/2018
 
