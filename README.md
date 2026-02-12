@@ -22,7 +22,7 @@ This simulator is a python implementation of the FDA-approved [UVa/Padova Simula
 
 ## Main Features
 
-- Simulation environment follows [OpenAI gym](https://github.com/openai/gym) and [rllab](https://github.com/rll/rllab) APIs. It returns observation, reward, done, info at each step, which means the simulator is "reinforcement-learning-ready".
+- Simulation environment follows [Gymnasium](https://github.com/Farama-Foundation/Gymnasium) and [rllab](https://github.com/rll/rllab) APIs. It returns observation, reward, terminated, truncated, info at each step, which means the simulator is "reinforcement-learning-ready".
 - Supports customized reward function. The reward function is a function of blood glucose measurements in the last hour. By default, the reward at each step is `risk[t-1] - risk[t]`. `risk[t]` is the risk index at time `t` defined in this [paper](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2903980/pdf/dia.2008.0138.pdf).
 - Supports parallel computing. The simulator simulates multiple patients in parallel using [pathos multiprocessing package](https://github.com/uqfoundation/pathos) (you are free to turn parallel off by setting `parallel=False`).
 - The simulator provides a random scenario generator (`from simglucose.simulation.scenario_gen import RandomScenario`) and a customized scenario generator (`from simglucose.simulation.scenario import CustomScenario`). Commandline user-interface will guide you through the scenario settings.
@@ -52,6 +52,12 @@ If you have `pip` installed, then
 
 ```bash
 pip install -e .
+```
+
+If you prefer [uv](https://github.com/astral-sh/uv) for installation and dependency management, then
+
+```bash
+uv pip install -e .
 ```
 
 If you do not have `pip`, then
@@ -134,14 +140,14 @@ simulate(sim_time=my_sim_time,
          parallel=True)
 ```
 
-### OpenAI Gym usage
+### Gymnasium usage
 
 - Using default reward
 
 ```python
-import gym
+import gymnasium as gym
 
-# Register gym environment. By specifying kwargs,
+# Register gymnasium environment. By specifying kwargs,
 # you are able to choose which patient or patients to simulate.
 # patient_name must be 'adolescent#001' to 'adolescent#010',
 # or 'adult#001' to 'adult#010', or 'child#001' to 'child#010'
@@ -151,7 +157,7 @@ import gym
 # every time the environment is reset, a random patient and scenario will be
 # chosen from the list
 
-from gym.envs.registration import register
+from gymnasium.envs.registration import register
 from simglucose.simulation.scenario import CustomScenario
 from datetime import datetime
 
@@ -168,20 +174,20 @@ register(
 
 env = gym.make('simglucose-adolescent2-v0')
 
-observation = env.reset()
+observation, info = env.reset()
 for t in range(100):
-    env.render(mode='human')
+    env.render()
     print(observation)
-    # Action in the gym environment is a scalar
+    # Action in the gymnasium environment is a scalar
     # representing the basal insulin, which differs from
-    # the regular controller action outside the gym
+    # the regular controller action outside the gymnasium
     # environment (a tuple (basal, bolus)).
     # In the perfect situation, the agent should be able
     # to control the glucose only through basal instead
     # of asking patient to take bolus
     action = env.action_space.sample()
-    observation, reward, done, info = env.step(action)
-    if done:
+    observation, reward, terminated, truncated, info = env.step(action)
+    if terminated or truncated:
         print("Episode finished after {} timesteps".format(t + 1))
         break
 ```
@@ -189,8 +195,8 @@ for t in range(100):
 - Customized reward function
 
 ```python
-import gym
-from gym.envs.registration import register
+import gymnasium as gym
+from gymnasium.envs.registration import register
 
 
 def custom_reward(BG_last_hour):
@@ -212,16 +218,17 @@ register(
 env = gym.make('simglucose-adolescent2-v0')
 
 reward = 1
-done = False
+terminated = False
+truncated = False
 
-observation = env.reset()
+observation, info = env.reset()
 for t in range(200):
-    env.render(mode='human')
+    env.render()
     action = env.action_space.sample()
-    observation, reward, done, info = env.step(action)
+    observation, reward, terminated, truncated, info = env.step(action)
     print(observation)
     print("Reward = {}".format(reward))
-    if done:
+    if terminated or truncated:
         print("Episode finished after {} timesteps".format(t + 1))
         break
 ```
@@ -235,7 +242,7 @@ from rllab.exploration_strategies.ou_strategy import OUStrategy
 from rllab.policies.deterministic_mlp_policy import DeterministicMLPPolicy
 from rllab.q_functions.continuous_mlp_q_function import ContinuousMLPQFunction
 from rllab.envs.gym_env import GymEnv
-from gym.envs.registration import register
+from gymnasium.envs.registration import register
 
 register(
     id='simglucose-adolescent2-v0',

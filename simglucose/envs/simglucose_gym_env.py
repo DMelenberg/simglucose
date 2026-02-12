@@ -6,16 +6,26 @@ from simglucose.simulation.scenario_gen import RandomScenario
 from simglucose.controller.base import Action
 import numpy as np
 import pkg_resources
-import gym
-from gym import spaces
-from gym.utils import seeding
+import gymnasium as gym
+from gymnasium import spaces
+import hashlib
 from datetime import datetime
-import gymnasium
-
 
 PATIENT_PARA_FILE = pkg_resources.resource_filename(
     "simglucose", "params/vpatient_params.csv"
 )
+
+
+def _hash_seed(seed, max_bytes=8):
+    seed = int(seed)
+    hash_bytes = hashlib.sha512(str(seed).encode("utf-8")).digest()
+    return int.from_bytes(hash_bytes[:max_bytes], "big")
+
+
+def _np_random(seed=None):
+    if seed is None:
+        seed = np.random.randint(0, 2**32 - 1)
+    return np.random.RandomState(seed), seed
 
 
 class T1DSimEnv(gym.Env):
@@ -23,7 +33,7 @@ class T1DSimEnv(gym.Env):
     A wrapper of simglucose.simulation.env.T1DSimEnv to support gym API
     """
 
-    metadata = {"render.modes": ["human"]}
+    metadata = {"render_modes": ["human"]}
 
     SENSOR_HARDWARE = "Dexcom"
     INSULIN_PUMP_HARDWARE = "Insulet"
@@ -42,39 +52,60 @@ class T1DSimEnv(gym.Env):
 
         self.patient_name = patient_name
         self.reward_fun = reward_fun
-        self.np_random, _ = seeding.np_random(seed=seed)
+        self.np_random, _ = _np_random(seed=seed)
         self.custom_scenario = custom_scenario
         self.env, _, _, _ = self._create_env()
 
     def _step(self, action: float):
         # This gym only controls basal insulin
-        act = Action(basal=action, bolus=0)
+        action_array = np.asarray(action)
+        if action_array.size != 1:
+            raise ValueError("Expected action to contain a single value.")
+        action_value = float(action_array.reshape(-1)[0])
+        act = Action(basal=action_value, bolus=0)
         if self.reward_fun is None:
             return self.env.step(act)
         return self.env.step(act, reward_fun=self.reward_fun)
+
+    def step(self, action):
+        obs, reward, done, info = self._step(action)
+        truncated = False
+        return obs, reward, done, truncated, info
 
     def _raw_reset(self):
         return self.env.reset()
 
     def _reset(self):
         self.env, _, _, _ = self._create_env()
-        obs, _, _, _ = self.env.reset()
-        return obs
+        step = self.env.reset()
+        return step.observation, step.info
+
+    def reset(self, *, seed=None, options=None):
+        if seed is not None:
+            self._seed(seed=seed)
+        obs, info = self._reset()
+        return obs, info
 
     def _seed(self, seed=None):
-        self.np_random, seed1 = seeding.np_random(seed=seed)
-        self.env, seed2, seed3, seed4 = self._create_env()
+        self.np_random, seed1 = _np_random(seed=seed)
+        seed_rng = np.random.RandomState(seed1)
+        seed2 = _hash_seed(seed_rng.randint(0, 1000)) % 2**31
+        seed3 = _hash_seed(seed2 + 1) % 2**31
+        seed4 = _hash_seed(seed3 + 1) % 2**31
         return [seed1, seed2, seed3, seed4]
+
+    def seed(self, seed=None):
+        return self._seed(seed=seed)
 
     def _create_env(self):
         # Derive a random seed. This gets passed as a uint, but gets
         # checked as an int elsewhere, so we need to keep it below
         # 2**31.
-        seed2 = seeding.hash_seed(self.np_random.randint(0, 1000)) % 2**31
-        seed3 = seeding.hash_seed(seed2 + 1) % 2**31
-        seed4 = seeding.hash_seed(seed3 + 1) % 2**31
+        seed2 = _hash_seed(self.np_random.randint(0, 1000)) % 2**31
+        seed3 = _hash_seed(seed2 + 1) % 2**31
+        seed4 = _hash_seed(seed3 + 1) % 2**31
 
-        hour = self.np_random.randint(low=0.0, high=24.0)
+        hour = self.np_random.randint(0, 24)
         start_time = datetime(2018, 1, 1, hour, 0, 0)
 
         if isinstance(self.patient_name, list):
@@ -103,8 +134,14 @@ class T1DSimEnv(gym.Env):
         self.env.render(close=close)
 
     def _close(self):
-        super()._close()
+        super().close()
         self.env._close_viewer()
+
+    def render(self):
+        self._render()
+
+    def close(self):
+        self._close()
 
     @property
     def action_space(self):
@@ -119,8 +156,16 @@ class T1DSimEnv(gym.Env):
     def max_basal(self):
         return self.env.pump._params["max_basal"]
 
+    @property
+    def scenario(self):
+        return self.env.scenario
 
-class T1DSimGymnaisumEnv(gymnasium.Env):
+    @property
+    def sensor(self):
+        return self.env.sensor
+
+
+class T1DSimGymnasiumEnv(gym.Env):
     metadata = {"render_modes": ["human"], "render_fps": 60}
     MAX_BG = 1000
 
@@ -140,25 +185,24 @@ class T1DSimGymnaisumEnv(gymnasium.Env):
             reward_fun=reward_fun,
             seed=seed,
         )
-        self.observation_space = gymnasium.spaces.Box(
+        self.observation_space = gym.spaces.Box(
             low=0, high=self.MAX_BG, shape=(1,), dtype=np.float32
         )
-        self.action_space = gymnasium.spaces.Box(
+        self.action_space = gym.spaces.Box(
             low=0, high=self.env.max_basal, shape=(1,), dtype=np.float32
         )
 
     def step(self, action):
-        obs, reward, done, info = self.env.step(action)
+        obs, reward, done, truncated, info = self.env.step(action)
         # Truncated will be controlled by TimeLimit wrapper when registering the env.
         # For example,
         # register(
         #     id="simglucose/adolescent2-v0",
-        #     entry_point="simglucose.envs:T1DSimGymnaisumEnv",
+        #     entry_point="simglucose.envs:T1DSimGymnasiumEnv",
         #     max_episode_steps=10,
         #     kwargs={"patient_name": "adolescent#002"},
         # )
         # Once the max_episode_steps is set, the truncated value will be overridden.
-        truncated = False
         return np.array([obs.CGM], dtype=np.float32), reward, done, truncated, info
 
     def reset(self, seed=None, options=None):
@@ -172,3 +216,4 @@ class T1DSimGymnaisumEnv(gymnasium.Env):
 
     def close(self):
         self.env.close()
+

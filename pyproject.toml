@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "simglucose"
+version = "0.2.11"
+description = "A Type-1 Diabetes Simulator as a Reinforcement Learning Environment in Gymnasium or rllab (python implementation of UVa/Padova Simulator)"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "Jinyu Xie", email = "xjygr08@gmail.com" }]
+dependencies = [
+  "gymnasium",
+  "pathos",
+  "scipy",
+  "matplotlib",
+  "numpy",
+  "pandas",
+]
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["simglucose*"]

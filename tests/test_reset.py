@@ -1,6 +1,6 @@
-import gym
+import gymnasium as gym
 import unittest
-from gym.envs.registration import register
+from gymnasium.envs.registration import register
 
 register(
         id='simglucose-adult2-v0',
@@ -13,12 +13,11 @@ class TestReset(unittest.TestCase):
     def test_reset_changes_observation_when_seed_is_fixed(self):
         env = gym.make('simglucose-adult2-v0')
 
-        env.seed(0)
-        observation0 = env.reset()
+        observation0, _ = env.reset(seed=0)
         start_time0 = env.env.scenario.start_time
         scenario0 = env.env.scenario.scenario
 
-        observation1 = env.reset()
+        observation1, _ = env.reset()
         start_time1 = env.env.scenario.start_time
         scenario1 = env.env.scenario.scenario
 
@@ -29,21 +28,19 @@ class TestReset(unittest.TestCase):
     def test_reset_change_is_deterministic_when_seed_is_fixed(self):
         env = gym.make('simglucose-adult2-v0')
 
-        env.seed(0)
-        observation0 = env.reset()
+        observation0, _ = env.reset(seed=0)
         start_time0 = env.env.scenario.start_time
         scenario0 = env.env.scenario.scenario
 
-        observation1 = env.reset()
+        observation1, _ = env.reset()
         start_time1 = env.env.scenario.start_time
         scenario1 = env.env.scenario.scenario
         
-        env.seed(0)
-        observation2 = env.reset()
+        observation2, _ = env.reset(seed=0)
         start_time2 = env.env.scenario.start_time
         scenario2 = env.env.scenario.scenario
 
-        observation3 = env.reset()
+        observation3, _ = env.reset()
         start_time3 = env.env.scenario.start_time
         scenario3 = env.env.scenario.scenario
 
@@ -59,21 +56,19 @@ class TestReset(unittest.TestCase):
     def test_reset_change_is_random_when_seed_is_different(self):
         env = gym.make('simglucose-adult2-v0')
 
-        env.seed(0)
-        observation0 = env.reset()
+        observation0, _ = env.reset(seed=0)
         start_time0 = env.env.scenario.start_time
         scenario0 = env.env.scenario.scenario
 
-        observation1 = env.reset()
+        observation1, _ = env.reset()
         start_time1 = env.env.scenario.start_time
         scenario1 = env.env.scenario.scenario
         
-        env.seed(1)
-        observation2 = env.reset()
+        observation2, _ = env.reset(seed=1)
         start_time2 = env.env.scenario.start_time
         scenario2 = env.env.scenario.scenario
 
-        observation3 = env.reset()
+        observation3, _ = env.reset()
         start_time3 = env.env.scenario.start_time
         scenario3 = env.env.scenario.scenario
 

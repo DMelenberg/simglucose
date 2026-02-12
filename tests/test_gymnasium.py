@@ -1,4 +1,4 @@
-import gymnasium
+import gymnasium as gym
 import unittest
 from gymnasium.envs.registration import register
 
@@ -7,12 +7,12 @@ class TestGymnasium(unittest.TestCase):
     def test_gymnasium_random_agent(self):
         register(
             id="simglucose/adolescent2-v0",
-            entry_point="simglucose.envs:T1DSimGymnaisumEnv",
+            entry_point="simglucose.envs:T1DSimGymnasiumEnv",
             max_episode_steps=10,
             kwargs={"patient_name": "adolescent#002"},
         )
 
-        env = gymnasium.make("simglucose/adolescent2-v0", render_mode="human")
+        env = gym.make("simglucose/adolescent2-v0", render_mode="human")
         observation, info = env.reset()
         for t in range(200):
             env.render()
