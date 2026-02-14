@@ -112,7 +112,11 @@ class T1DPatient(Patient):
 
     @staticmethod
     def model(t, x, action, params, last_Qsto, last_foodtaken):
-        dxdt = np.zeros(13)
+        # Extended from 13 to 16 states to include exercise (Breton 2009 model)
+        # x[13]: Y - Glucose effectiveness modulation
+        # x[14]: Z - Insulin sensitivity rapid component
+        # x[15]: W - Insulin sensitivity slow component
+        dxdt = np.zeros(16)
         d = action.CHO * 1000  # g -> mg
         insulin = action.insulin * 6000 / params.BW  # U/min -> pmol/kg/min
         basal = params.u2ss * params.BW / 6000  # U/min
@@ -148,8 +152,20 @@ class T1DPatient(Patient):
         Rat = params.f * params.kabs * x[2] / params.BW
         # Glucose Production
         EGPt = params.kp1 - params.kp2 * x[3] - params.kp3 * x[8]
-        # Glucose Utilization
-        Uiit = params.Fsnc
+
+        # Exercise effects (Breton 2009 model)
+        # Glucose effectiveness increase: non-insulin-dependent uptake
+        GE_exercise_factor = 1.0
+        if hasattr(params, 'alpha_GE') and len(x) > 13:
+            GE_exercise_factor = 1.0 + params.alpha_GE * x[13]
+
+        # Insulin sensitivity increase: affects insulin-dependent uptake
+        SI_exercise_factor = 1.0
+        if hasattr(params, 'alpha_SI') and len(x) > 15:
+            SI_exercise_factor = 1.0 + params.alpha_SI * x[15]
+
+        # Glucose Utilization (insulin-independent, enhanced by exercise)
+        Uiit = params.Fsnc * GE_exercise_factor
 
         # renal excretion
         if x[3] > params.ke2:
@@ -162,7 +178,8 @@ class T1DPatient(Patient):
         dxdt[3] = max(EGPt, 0) + Rat - Uiit - Et - params.k1 * x[3] + params.k2 * x[4]
         dxdt[3] = (x[3] >= 0) * dxdt[3]
 
-        Vmt = params.Vm0 + params.Vmx * x[6]
+        # Insulin-dependent glucose utilization (enhanced by exercise via SI)
+        Vmt = params.Vm0 + params.Vmx * x[6] * SI_exercise_factor
         Kmt = params.Km0
         Uidt = Vmt * x[4] / (Kmt + x[4])
         dxdt[4] = -Uidt + params.k1 * x[3] - params.k2 * x[4]
@@ -200,6 +217,39 @@ class T1DPatient(Patient):
         # subcutaneous glucose
         dxdt[12] = -params.ksc * x[12] + params.ksc * x[3]
         dxdt[12] = (x[12] >= 0) * dxdt[12]
+
+        # Exercise dynamics (Breton 2009 model - 3 additional states)
+        # Only active if exercise parameters are present
+        if len(x) > 13:
+            # Get heart rate input (defaults to resting if not provided)
+            HR = getattr(params, 'current_heart_rate', getattr(params, 'resting_heart_rate', 70.0))
+            HRrest = getattr(params, 'resting_heart_rate', 70.0)
+            HRmax = getattr(params, 'max_heart_rate', 185.0)
+
+            # Normalized exercise intensity (0-1 range)
+            # PVO2 ~ fraction of VO2max based on heart rate reserve
+            PVO2 = max(0.0, (HR - HRrest) / (HRmax - HRrest))
+            PVO2 = min(1.0, PVO2)  # Clip to [0, 1]
+
+            # Time constants (minutes)
+            tau_GE = getattr(params, 'tau_GE_on', 15.0)
+            tau_SI_on = getattr(params, 'tau_SI_on', 15.0)
+            tau_SI_off = getattr(params, 'tau_SI_off', 120.0)
+
+            # x[13]: Y - Glucose effectiveness (rapid on/off)
+            dxdt[13] = (PVO2 - x[13]) / tau_GE
+
+            # x[14]: Z - Insulin sensitivity rapid component (rapid on)
+            dxdt[14] = (PVO2 - x[14]) / tau_SI_on
+
+            # x[15]: W - Insulin sensitivity slow component (slow off)
+            # Creates post-exercise insulin sensitivity persistence
+            dxdt[15] = (x[14] - x[15]) / tau_SI_off
+
+            # Debug logging for exercise
+            if PVO2 > 0.1:
+                logger.debug("t = {}, exercise active: HR={:.1f}, PVO2={:.2f}, Y={:.2f}, W={:.2f}".format(
+                    t, HR, PVO2, x[13], x[15]))
 
         if action.insulin > basal:
             logger.debug("t = {}, injecting insulin: {}".format(t, action.insulin))
@@ -248,9 +298,18 @@ class T1DPatient(Patient):
         Reset the patient state to default intial state
         """
         if self._init_state is None:
-            self.init_state = np.copy(self._params.iloc[2:15].values)
+            # Load base 13 states from patient parameter file
+            base_state = np.copy(self._params.iloc[2:15].values)
+            # Append 3 exercise states (initialized to 0)
+            # x[13] = Y (glucose effectiveness) = 0
+            # x[14] = Z (insulin sensitivity rapid) = 0
+            # x[15] = W (insulin sensitivity slow) = 0
+            self.init_state = np.concatenate([base_state, np.zeros(3)])
         else:
             self.init_state = self._init_state
+            # Ensure exercise states exist
+            if len(self.init_state) < 16:
+                self.init_state = np.concatenate([self.init_state, np.zeros(16 - len(self.init_state))])
 
         self.random_state = np.random.RandomState(self.seed)
         if self.random_init_bg:
