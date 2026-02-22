@@ -43,12 +43,11 @@ from typing import Optional, Sequence
 import numpy as np
 import pandas as pd
 import torch
-import torch.nn.functional as F
 
 # ---------------------------------------------------------------------------
 # Patient parameter file (same source as the original implementation)
 # ---------------------------------------------------------------------------
-PATIENT_PARA_FILE = Path(__file__).parent.parent / "params" / "vpatient_params.csv"
+PATIENT_PARA_FILE = str(Path(__file__).parent.parent / "params" / "vpatient_params.csv")
 
 # Columns used from the CSV (in the order they are stored in the parameter
 # tensor produced by _build_param_tensor).  This ordering is internal and
@@ -90,11 +89,6 @@ _PARAM_COLS: list[str] = [
 
 # Symbolic indices into the parameter tensor (avoids magic numbers in code).
 _P = {name: i for i, name in enumerate(_PARAM_COLS)}
-
-# Initial-state columns (x0_1 … x0_13) map to ODE states 0–12.
-_STATE_COLS: list[str] = [f"x0_{i:>2}" if i < 10 else f"x0_{i}" for i in range(1, 14)]
-# Correct for the actual CSV column names (space-padded up to 2 digits):
-_STATE_COLS = [f"x0_{i: >2}" for i in range(1, 14)]
 
 # Exercise-related defaults (Breton 2008 parameters not present in CSV).
 _EXERCISE_DEFAULTS = {
@@ -176,7 +170,6 @@ def _patient_ode(
     Vi   = params[:, _P["Vi"]]
     Ib   = params[:, _P["Ib"]]
     BW   = params[:, _P["BW"]]
-    Vg   = params[:, _P["Vg"]]   # noqa: F841 – used below via observation
     u2ss = params[:, _P["u2ss"]]
 
     # ------------------------------------------------------------------
