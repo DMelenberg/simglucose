@@ -112,7 +112,7 @@ class T1DPatient(Patient):
 
     @staticmethod
     def model(t, x, action, params, last_Qsto, last_foodtaken):
-        # Extended from 13 to 16 states to include exercise (Breton 2009 model)
+        # Extended from 13 to 16 states to include exercise (Breton 2008 model)
         # x[13]: Y - Glucose effectiveness modulation
         # x[14]: Z - Insulin sensitivity rapid component
         # x[15]: W - Insulin sensitivity slow component
@@ -218,7 +218,7 @@ class T1DPatient(Patient):
         dxdt[12] = -params.ksc * x[12] + params.ksc * x[3]
         dxdt[12] = (x[12] >= 0) * dxdt[12]
 
-        # Exercise dynamics (Breton 2009 model - 3 additional states)
+        # Exercise dynamics (Breton 2008 model - 3 additional states)
         # Only active if exercise parameters are present
         if len(x) > 13:
             # Get heart rate input (defaults to resting if not provided)
@@ -295,7 +295,7 @@ class T1DPatient(Patient):
 
     def reset(self):
         """
-        Reset the patient state to default intial state
+        Reset the patient state to default initial state
         """
         if self._init_state is None:
             # Load base 13 states from patient parameter file

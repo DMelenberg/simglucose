@@ -84,11 +84,7 @@ def _run_torch(patient_name: str, steps: int, scenario: list[tuple],
     patient = T1DPatientTorch.from_patient_names(
         [patient_name], n_substeps=n_substeps, dtype=dtype
     )
-    import pandas as pd
-    from simglucose.patient.t1dpatient_torch import PATIENT_PARA_FILE
-    df = pd.read_csv(PATIENT_PARA_FILE)
-    params = df.loc[df["Name"] == patient_name].squeeze()
-    basal = float(params["u2ss"] * params["BW"] / 6000.0)
+    basal = float(patient.basal_rate[0].item())
 
     scenario_dict = {t: (cho, ins) for t, cho, ins in scenario}
     bgs = []
@@ -122,11 +118,8 @@ MAX_ABS_ERROR_MG_DL = 0.01  # acceptance threshold [mg/dL]
 
 # Scenario: 80 g meal at t=200 min with compensatory insulin
 def _make_scenario():
-    import pandas as pd
-    from simglucose.patient.t1dpatient_torch import PATIENT_PARA_FILE
-    df = pd.read_csv(PATIENT_PARA_FILE)
-    params = df.loc[df["Name"] == PATIENT_NAME].squeeze()
-    basal = float(params["u2ss"] * params["BW"] / 6000.0)
+    patient = T1DPatientTorch.from_patient_names([PATIENT_NAME])
+    basal = float(patient.basal_rate[0].item())
     meal_bolus = 80.0 / 6.0 + basal   # U/min for 6 min (simplified)
     # t=200: announce 80g meal, give bolus insulin
     return [(200, 80.0, meal_bolus)]
@@ -150,7 +143,7 @@ class TestNumericalEquivalence:
         return _run_torch(PATIENT_NAME, SIM_STEPS, scenario, n_substeps=10)
 
     def test_max_abs_error_within_threshold(self, scipy_bgs, torch_bgs):
-        """Max |ΔBGL| must be below 0.5 mg/dL over 24 h."""
+        """Max |ΔBGL| must be below MAX_ABS_ERROR_MG_DL (0.01 mg/dL) over 24 h."""
         err = np.abs(scipy_bgs - torch_bgs)
         max_err = float(err.max())
         assert max_err < MAX_ABS_ERROR_MG_DL, (
@@ -272,7 +265,7 @@ class TestBatchedEnv:
                             cgm_noise_sigma=0.0)
         env.reset(seed=0)
         action = env.basal_rate.unsqueeze(1)
-        init_bg = env.state()[:, 3] / env._patient._params[:, -2]  # Gp/Vg
+        init_bg = env._patient.plasma_glucose
 
         for _ in range(120):   # 2 hours
             obs, _, _, info = env.step(action)
