@@ -1,10 +1,8 @@
-import pkg_resources
 import pandas as pd
+from pathlib import Path
 
-CONTROL_QUEST = pkg_resources.resource_filename('simglucose',
-                                                'params/Quest.csv')
-PATIENT_PARA_FILE = pkg_resources.resource_filename(
-    'simglucose', 'params/vpatient_params.csv')
+CONTROL_QUEST = Path(__file__).parent / 'params' / 'Quest.csv'
+PATIENT_PARA_FILE = Path(__file__).parent / 'params' / 'vpatient_params.csv'
 
 
 def fetch_patient_params(patient_name: str):

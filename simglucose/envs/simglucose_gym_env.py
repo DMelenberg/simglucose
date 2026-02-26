@@ -5,15 +5,13 @@ from simglucose.actuator.pump import InsulinPump
 from simglucose.simulation.scenario_gen import RandomScenario
 from simglucose.controller.base import Action
 import numpy as np
-import pkg_resources
 import gymnasium as gym
 from gymnasium import spaces
 import hashlib
 from datetime import datetime
+from pathlib import Path
 
-PATIENT_PARA_FILE = pkg_resources.resource_filename(
-    "simglucose", "params/vpatient_params.csv"
-)
+PATIENT_PARA_FILE = Path(__file__).parent.parent / "params" / "vpatient_params.csv"
 
 
 def _hash_seed(seed, max_bytes=8):

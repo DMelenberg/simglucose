@@ -1,10 +1,9 @@
 import pandas as pd
-import pkg_resources
 import logging
 import numpy as np
+from pathlib import Path
 
-INSULIN_PUMP_PARA_FILE = pkg_resources.resource_filename(
-    'simglucose', 'params/pump_params.csv')
+INSULIN_PUMP_PARA_FILE = Path(__file__).parent.parent / 'params' / 'pump_params.csv'
 logger = logging.getLogger(__name__)
 
 
