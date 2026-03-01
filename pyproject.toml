@@ -1,6 +1,6 @@
 [build-system]
-requires = ["setuptools>=61.0"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [project]
 name = "simglucose"
@@ -19,8 +19,5 @@ dependencies = [
   "pandas",
 ]
 
-[tool.setuptools]
-include-package-data = true
-
-[tool.setuptools.packages.find]
-include = ["simglucose*"]
+[tool.hatch.build.targets.wheel]
+packages = ["simglucose"]
