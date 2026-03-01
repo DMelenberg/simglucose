@@ -74,7 +74,16 @@ class T1DPatient(Patient):
     def sample_time(self):
         return self.SAMPLE_TIME
 
-    def step(self, action):
+    def step(self, action, phys=None):
+        """
+        Advance the ODE by one sample_time step.
+
+        Args:
+            action: patient_action namedtuple with CHO (g/min) and insulin (U/min).
+            phys:   Optional PhysioState with time-varying modulation factors.
+                    None = legacy mode (exercise effects via hasattr(params, ...)).
+                    Provided = unified modulation path (circadian + menstrual + exercise).
+        """
         # Convert announcing meal to the meal amount to eat at the moment
         to_eat = self._announce_meal(action.CHO)
         action = action._replace(CHO=to_eat)
@@ -100,9 +109,9 @@ class T1DPatient(Patient):
         # Update last input
         self._last_action = action
 
-        # ODE solver
+        # ODE solver — pass phys as extra arg (None = legacy fallback)
         self._odesolver.set_f_params(
-            action, self._params, self._last_Qsto, self._last_foodtaken
+            action, self._params, self._last_Qsto, self._last_foodtaken, phys
         )
         if self._odesolver.successful():
             self._odesolver.integrate(self._odesolver.t + self.sample_time)
@@ -111,7 +120,38 @@ class T1DPatient(Patient):
             raise
 
     @staticmethod
-    def model(t, x, action, params, last_Qsto, last_foodtaken):
+    def model(t, x, action, params, last_Qsto, last_foodtaken, phys=None):
+        """
+        UVA/Padova T1D ODE — 16 states (13 base + 3 Breton 2009 exercise).
+
+        State vector x[0:16]:
+            x[0]  Qsto_solid  — gastric solid compartment (mg)
+            x[1]  Qsto_liquid — gastric liquid compartment (mg)
+            x[2]  Qgut        — intestinal glucose (mg)
+            x[3]  Gp          — plasma glucose (mg/kg)
+            x[4]  Gt          — tissue glucose (mg/kg)
+            x[5]  Ip          — plasma insulin (pmol/kg)
+            x[6]  Id          — insulin action on glucose utilisation
+            x[7]  Ih1         — insulin action on EGP (integrator 1)
+            x[8]  Ih2         — insulin action on EGP (integrator 2)
+            x[9]  Iliver      — hepatic insulin (pmol/kg)
+            x[10] Isc1        — subcutaneous insulin depot 1
+            x[11] Isc2        — subcutaneous insulin depot 2
+            x[12] Gsub        — subcutaneous glucose (mg/kg, CGM reading)
+            x[13] Y           — Breton: glucose effectiveness state
+            x[14] Z           — Breton: SI rapid component
+            x[15] W           — Breton: SI slow component (post-exercise)
+
+        Args:
+            t:             Current simulation time (min).
+            x:             State vector (len 16).
+            action:        patient_action(CHO g/min, insulin U/min).
+            params:        Patient parameters (pandas Series, 62 calibrated values).
+            last_Qsto:     Previous gastric content (mg).
+            last_foodtaken: Cumulative food intake in current meal (g).
+            phys:          PhysioState — time-varying modulation factors.
+                           None = legacy mode (exercise only via hasattr pattern).
+        """
         # Extended from 13 to 16 states to include exercise (Breton 2008 model)
         # x[13]: Y - Glucose effectiveness modulation
         # x[14]: Z - Insulin sensitivity rapid component
@@ -120,6 +160,25 @@ class T1DPatient(Patient):
         d = action.CHO * 1000  # g -> mg
         insulin = action.insulin * 6000 / params.BW  # U/min -> pmol/kg/min
         basal = params.u2ss * params.BW / 6000  # U/min
+
+        # --- Resolve physiological modulation factors ---
+        # PhysioState path: unified circadian + menstrual + daily + exercise
+        # Legacy path: exercise only via hasattr(params, ...) for backward compat
+        if phys is not None:
+            GE_total = phys.exercise_GE          # 1 + alpha_GE * Y
+            SI_total = phys.composite_SI         # circadian * menstrual * daily * exercise
+            kabs_factor = phys.composite_kabs    # menstrual gastric slowing
+            EGP_factor = phys.circadian_EGP      # dawn cortisol-driven EGP increase
+        else:
+            # Legacy: exercise effects from params (backward compatible)
+            GE_total = 1.0
+            if hasattr(params, 'alpha_GE') and len(x) > 13:
+                GE_total = 1.0 + params.alpha_GE * x[13]
+            SI_total = 1.0
+            if hasattr(params, 'alpha_SI') and len(x) > 15:
+                SI_total = 1.0 + params.alpha_SI * x[15]
+            kabs_factor = 1.0
+            EGP_factor = 1.0
 
         # Glucose in the stomach
         qsto = x[0] + x[1]
@@ -145,27 +204,18 @@ class T1DPatient(Patient):
         # stomach liquid
         dxdt[1] = params.kmax * x[0] - x[1] * kgut
 
-        # intestine
-        dxdt[2] = kgut * x[1] - params.kabs * x[2]
+        # intestine — kabs_factor < 1 during luteal phase (progesterone slows emptying)
+        kabs_eff = params.kabs * kabs_factor
+        dxdt[2] = kgut * x[1] - kabs_eff * x[2]
 
-        # Rate of appearance
-        Rat = params.f * params.kabs * x[2] / params.BW
-        # Glucose Production
-        EGPt = params.kp1 - params.kp2 * x[3] - params.kp3 * x[8]
+        # Rate of appearance — uses effective kabs
+        Rat = params.f * kabs_eff * x[2] / params.BW
 
-        # Exercise effects (Breton 2009 model)
-        # Glucose effectiveness increase: non-insulin-dependent uptake
-        GE_exercise_factor = 1.0
-        if hasattr(params, 'alpha_GE') and len(x) > 13:
-            GE_exercise_factor = 1.0 + params.alpha_GE * x[13]
+        # Glucose Production — EGP_factor > 1 at dawn (cortisol-driven EGP rise)
+        EGPt = params.kp1 * EGP_factor - params.kp2 * x[3] - params.kp3 * x[8]
 
-        # Insulin sensitivity increase: affects insulin-dependent uptake
-        SI_exercise_factor = 1.0
-        if hasattr(params, 'alpha_SI') and len(x) > 15:
-            SI_exercise_factor = 1.0 + params.alpha_SI * x[15]
-
-        # Glucose Utilization (insulin-independent, enhanced by exercise)
-        Uiit = params.Fsnc * GE_exercise_factor
+        # Glucose Utilization (insulin-independent, enhanced by exercise GE)
+        Uiit = params.Fsnc * GE_total
 
         # renal excretion
         if x[3] > params.ke2:
@@ -178,8 +228,9 @@ class T1DPatient(Patient):
         dxdt[3] = max(EGPt, 0) + Rat - Uiit - Et - params.k1 * x[3] + params.k2 * x[4]
         dxdt[3] = (x[3] >= 0) * dxdt[3]
 
-        # Insulin-dependent glucose utilization (enhanced by exercise via SI)
-        Vmt = params.Vm0 + params.Vmx * x[6] * SI_exercise_factor
+        # Insulin-dependent glucose utilization
+        # SI_total combines circadian + menstrual + daily drift + exercise sensitivity
+        Vmt = params.Vm0 + params.Vmx * x[6] * SI_total
         Kmt = params.Km0
         Uidt = Vmt * x[4] / (Kmt + x[4])
         dxdt[4] = -Uidt + params.k1 * x[3] - params.k2 * x[4]
