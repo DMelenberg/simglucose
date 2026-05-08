@@ -84,6 +84,8 @@ There are four equations that define insulin kinetics, the below variables defin
 * doskempt - I assume this refers to $k_{empt}$ which is the rate constant of gastric emptying, which is a nonlinear function of $Q_{sto}$
   * $Q_{sto}$ (mg) - is the amount of glucose in the stomach
 * u2ss - used for calculating basal insulin in ```t1dpatient.py``` see ```basal = p._params.u2ss * p._params.BW / 6000  # U/min```
+  * **Clinical interpretation**: ``basal_U_per_hr = u2ss * BW * 60 / 6000``. For ``adult#001`` (BW=102.32 kg, u2ss=1.2386 pmol/L/kg) this gives ~1.27 U/hr, the value a clinician would program as the flat basal rate on a pump.
+  * Per-patient clinical pump settings (insulin-to-carb ratio CR g/U, correction factor CF mg/dL/U, total daily insulin TDI U/day) are in ``simglucose/params/Quest.csv`` and used by ``simglucose.controller.basal_bolus_ctrller.BBController``.
 * isclss - $I_{sc1}(0) = I_{sc1ss}$, the first steady state of subcutaneous insulin parameter
 * isc2ss - $I_{sc2}(0) = I_{sc2ss}$, the second steady state of subcutaneous insulin parameter
 * sp1 - could not find in code base
