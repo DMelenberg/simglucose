@@ -74,6 +74,25 @@ class T1DPatient(Patient):
     def sample_time(self):
         return self.SAMPLE_TIME
 
+    @property
+    def body_weight(self) -> float:
+        """Patient body weight in kg (calibrated UVA/Padova parameter)."""
+        return float(self._params.BW)
+
+    @property
+    def glucose_volume(self) -> float:
+        """Glucose distribution volume in dL/kg (calibrated UVA/Padova parameter)."""
+        return float(self._params.Vg)
+
+    @property
+    def insulin_volume(self) -> float:
+        """Insulin distribution volume in L/kg (calibrated UVA/Padova parameter)."""
+        return float(self._params.Vi)
+
+    def set_basal_rate_multiplier(self, factor: float) -> None:
+        """Scale u2ss (steady-state basal infusion rate) by factor. Call before simulation starts."""
+        self._params.u2ss = self._params.u2ss * factor
+
     def step(self, action, phys=None):
         """
         Advance the ODE by one sample_time step.
@@ -272,20 +291,21 @@ class T1DPatient(Patient):
         # Exercise dynamics (Breton 2008 model - 3 additional states)
         # Only active if exercise parameters are present
         if len(x) > 13:
-            # Get heart rate input (defaults to resting if not provided)
-            HR = getattr(params, 'current_heart_rate', getattr(params, 'resting_heart_rate', 70.0))
-            HRrest = getattr(params, 'resting_heart_rate', 70.0)
-            HRmax = getattr(params, 'max_heart_rate', 185.0)
-
-            # Normalized exercise intensity (0-1 range)
-            # PVO2 ~ fraction of VO2max based on heart rate reserve
-            PVO2 = max(0.0, (HR - HRrest) / (HRmax - HRrest))
-            PVO2 = min(1.0, PVO2)  # Clip to [0, 1]
-
-            # Time constants (minutes)
-            tau_GE = getattr(params, 'tau_GE_on', 15.0)
-            tau_SI_on = getattr(params, 'tau_SI_on', 15.0)
-            tau_SI_off = getattr(params, 'tau_SI_off', 120.0)
+            if phys is not None:
+                # PhysioState path: PVO2 and time constants computed by AID before ODE call
+                PVO2 = phys.exercise_PVO2
+                tau_GE = phys.exercise_tau_GE
+                tau_SI_on = phys.exercise_tau_SI_on
+                tau_SI_off = phys.exercise_tau_SI_off
+            else:
+                # Legacy path: read HR and tau from params (backward compatible)
+                HR = getattr(params, 'current_heart_rate', getattr(params, 'resting_heart_rate', 70.0))
+                HRrest = getattr(params, 'resting_heart_rate', 70.0)
+                HRmax = getattr(params, 'max_heart_rate', 185.0)
+                PVO2 = max(0.0, min(1.0, (HR - HRrest) / (HRmax - HRrest)))
+                tau_GE = getattr(params, 'tau_GE_on', 15.0)
+                tau_SI_on = getattr(params, 'tau_SI_on', 15.0)
+                tau_SI_off = getattr(params, 'tau_SI_off', 120.0)
 
             # x[13]: Y - Glucose effectiveness (rapid on/off)
             dxdt[13] = (PVO2 - x[13]) / tau_GE
@@ -297,10 +317,9 @@ class T1DPatient(Patient):
             # Creates post-exercise insulin sensitivity persistence
             dxdt[15] = (x[14] - x[15]) / tau_SI_off
 
-            # Debug logging for exercise
             if PVO2 > 0.1:
-                logger.debug("t = {}, exercise active: HR={:.1f}, PVO2={:.2f}, Y={:.2f}, W={:.2f}".format(
-                    t, HR, PVO2, x[13], x[15]))
+                logger.debug("t = {}, exercise active: PVO2={:.2f}, Y={:.2f}, W={:.2f}".format(
+                    t, PVO2, x[13], x[15]))
 
         if action.insulin > basal:
             logger.debug("t = {}, injecting insulin: {}".format(t, action.insulin))
