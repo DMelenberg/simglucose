@@ -21,3 +21,8 @@ dependencies = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["simglucose"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.2",
+]
