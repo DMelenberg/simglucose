@@ -14,10 +14,10 @@ class TestSeed(unittest.TestCase):
         env = gym.make('simglucose-adult1-v0')
 
         observation_seed0, _ = env.reset(seed=0)
-        start_time_seed0 = env.env.scenario.start_time
+        start_time_seed0 = env.unwrapped.scenario.start_time
 
         observation_seed1, _ = env.reset(seed=1000)
-        start_time_seed1 = env.env.scenario.start_time
+        start_time_seed1 = env.unwrapped.scenario.start_time
 
         self.assertNotEqual(start_time_seed0, start_time_seed1)
         self.assertNotEqual(observation_seed0, observation_seed1)
