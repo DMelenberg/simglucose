@@ -199,6 +199,45 @@ SI_effective = SI_base * stress_factor
 
 ---
 
+## Modification 4: PhysioState Interface
+
+**Location**: `simglucose/patient/t1dpatient.py` (the `model()` ODE function, `phys` keyword argument) + `simglucose/patient/t1dpatient_torch.py` (GPU-batched ODE counterpart).
+
+**Status**: Implemented (added 2026-05-08 via simglucose PR #7 / commit `fac004a` — see T-003 in AID's `TASKS.md`).
+
+**What it does**: A unified value-object carrying dimensionless multipliers for circadian, menstrual, daily-SI-drift, and exercise modulations of the calibrated UVA/Padova ODE. The ODE's `model()` accepts an optional `phys` keyword: when `phys is None`, the ODE reduces bit-for-bit to the calibrated UVA/Padova baseline (regression-tested on AID side via `tests/test_physio_exercise_refactor.py::test_default_path_bit_identical` with `atol=1e-6`); when `phys` is supplied, each multiplier scales its target ODE term. The 62 calibrated parameters in `params/vpatient_params.csv` are NEVER modified — the multipliers act as time-varying gains on existing terms.
+
+**Fields**: The following dimensionless multipliers (or minute-valued time constants) are carried on `PhysioState`:
+
+- `circadian_SI` (dimensionless): Insulin sensitivity multiplier for the dawn phenomenon; less than 1.0 during early morning hours when cortisol-driven insulin resistance peaks, approximately 1.0 at all other times.
+- `circadian_EGP` (dimensionless): Endogenous glucose production multiplier for cortisol-driven EGP rise during dawn; greater than 1.0 at dawn, approximately 1.0 elsewhere.
+- `menstrual_SI` (dimensionless): Insulin sensitivity multiplier for the menstrual cycle phase; less than 1.0 during the luteal phase (progesterone-driven insulin resistance) and greater than 1.0 during the follicular phase.
+- `menstrual_kabs` (dimensionless): Gastric absorption rate multiplier for luteal-phase progesterone-driven gastric emptying slowdown; less than 1.0 during the luteal phase, 1.0 elsewhere.
+- `daily_SI` (dimensionless): Day-to-day insulin sensitivity drift multiplier drawn from a LogNormal distribution around 1.0; captures inter-day variability in insulin requirements.
+- `exercise_GE` (dimensionless): Glucose effectiveness multiplier during exercise, computed from the Breton 2009 Y state variable (non-insulin-dependent glucose uptake increase).
+- `exercise_SI` (dimensionless): Exercise-driven insulin sensitivity multiplier computed from the Breton 2009 W state variable (post-exercise insulin sensitivity persistence).
+- `exercise_PVO2` (dimensionless, range 0–1): Normalized exercise intensity (percent of VO2max), computed from heart-rate reserve by the AID layer before each ODE call.
+- `exercise_tau_GE` (minutes): Glucose effectiveness time constant during exercise; governs the rate at which the Y state variable responds to changes in exercise intensity.
+- `exercise_tau_SI_on` (minutes): Rapid insulin sensitivity activation time constant during exercise; governs the rise of the Z state variable.
+- `exercise_tau_SI_off` (minutes): Slow insulin sensitivity decay time constant after exercise cessation; governs the decline of the W state variable.
+
+The ODE also exposes two computed properties that aggregate the above fields: `composite_SI` (product of `circadian_SI`, `menstrual_SI`, `daily_SI`, and `exercise_SI`), applied to the insulin-dependent glucose uptake term `Vm0 + Vmx * x[6]`; and `composite_kabs` (currently equal to `menstrual_kabs`), applied to the gastric absorption rate.
+
+**Citations**:
+
+- **Circadian / dawn SI reduction**: Carroll MF, Schade DS (2005). "The dawn phenomenon revisited: implications for diabetes therapy." *Endocr Pract* 11(1):55-64. DOI: [10.4158/EP.11.1.55](https://doi.org/10.4158/EP.11.1.55)
+- **Menstrual-cycle SI swing**: Brown SA, et al. (2015). "Fluctuations of hyperglycemia and insulin sensitivity are linked to menstrual cycle phases in women with T1D." *J Diabetes Sci Technol* 9(6):1192-1199. DOI: [10.1177/1932296815608400](https://doi.org/10.1177/1932296815608400)
+- **Day-to-day SI drift (LogNormal model)**: Kovatchev BP, Breton M, Dalla Man C, Cobelli C (2009). "In silico preclinical trials: a proof of concept in closed-loop control of type 1 diabetes." *J Diabetes Sci Technol* 3(1):44-55. DOI: [10.1177/193229680900300106](https://doi.org/10.1177/193229680900300106)
+- **Exercise dynamics (PVO2 + Y/Z/W ODE extension)**: See Modification 1 above (Dalla Man C, Breton MD, Cobelli C (2009). DOI: [10.1177/193229680900300107](https://doi.org/10.1177/193229680900300107)).
+
+**Safe because**: When `phys=None`, the ODE is byte-for-byte equivalent to the pre-PhysioState UVA/Padova baseline — no code path inside `model()` changes when `phys` is absent. All multipliers are bounded: in worst-case extremes tested by `tests/test_joint_physio_sanity.py` on the AID side, the composite SI factor lies within `[0.1, 2.5]`; the 62 calibrated parameters in `params/vpatient_params.csv` are preserved unchanged. The PhysioState pattern is the only scientifically valid extension mechanism: it adds time-varying gains on existing ODE terms without altering any calibrated constant.
+
+**Use case**: On the AID side, `src/glucose_rl/physio_modulations.py` builds a `PhysioState` instance at each one-minute ODE inner step using the current simulation clock, menstrual-cycle day, per-day SI multiplier, and heart-rate sensor reading. `src/glucose_rl/env.py` calls `compute_phys_state()` once per ODE inner step and passes the result to `T1DPatient.step()`, which forwards it to `model()`. `BatchedBloodGlucoseEnv` performs the equivalent GPU-side computation, constructing exercise and heart-rate modulation tensors and passing them through the PyTorch RK4 ODE solver in `simglucose/patient/t1dpatient_torch.py`.
+
+**Related**: The exercise multipliers in `PhysioState` (`exercise_PVO2`, `exercise_tau_GE`, `exercise_tau_SI_on`, `exercise_tau_SI_off`, `exercise_GE`, `exercise_SI`) feed the Breton 2009 exercise extension documented in Modification 1 above; `PhysioState` generalises the 2009 paper's HR-driven mechanism to also carry circadian, menstrual, and daily-SI factors in a single unified value-object.
+
+---
+
 ## Non-Modifications (What We Don't Change)
 
 ### Base 13-State ODE Equations
