@@ -270,22 +270,31 @@ class T1DPatient(Patient):
         dxdt[12] = (x[12] >= 0) * dxdt[12]
 
         # Exercise dynamics (Breton 2008 model - 3 additional states)
-        # Only active if exercise parameters are present
+        # The 3 exercise states always exist (reset() pads to 16); they stay inert
+        # while PVO2 == 0 (heart rate at rest).
         if len(x) > 13:
-            # Get heart rate input (defaults to resting if not provided)
-            HR = getattr(params, 'current_heart_rate', getattr(params, 'resting_heart_rate', 70.0))
-            HRrest = getattr(params, 'resting_heart_rate', 70.0)
-            HRmax = getattr(params, 'max_heart_rate', 185.0)
+            # Heart rate + time constants come from PhysioState (preferred) so the
+            # calibrated params are never mutated. Legacy path reads params via
+            # getattr for backward compatibility when phys is None.
+            if phys is not None:
+                HR = getattr(phys, 'heart_rate', 70.0)
+                HRrest = getattr(phys, 'resting_hr', 70.0)
+                HRmax = getattr(phys, 'max_hr', 185.0)
+                tau_GE = getattr(phys, 'tau_GE', 15.0)
+                tau_SI_on = getattr(phys, 'tau_SI_on', 15.0)
+                tau_SI_off = getattr(phys, 'tau_SI_off', 120.0)
+            else:
+                HR = getattr(params, 'current_heart_rate', getattr(params, 'resting_heart_rate', 70.0))
+                HRrest = getattr(params, 'resting_heart_rate', 70.0)
+                HRmax = getattr(params, 'max_heart_rate', 185.0)
+                tau_GE = getattr(params, 'tau_GE_on', 15.0)
+                tau_SI_on = getattr(params, 'tau_SI_on', 15.0)
+                tau_SI_off = getattr(params, 'tau_SI_off', 120.0)
 
             # Normalized exercise intensity (0-1 range)
             # PVO2 ~ fraction of VO2max based on heart rate reserve
             PVO2 = max(0.0, (HR - HRrest) / (HRmax - HRrest))
             PVO2 = min(1.0, PVO2)  # Clip to [0, 1]
-
-            # Time constants (minutes)
-            tau_GE = getattr(params, 'tau_GE_on', 15.0)
-            tau_SI_on = getattr(params, 'tau_SI_on', 15.0)
-            tau_SI_off = getattr(params, 'tau_SI_off', 120.0)
 
             # x[13]: Y - Glucose effectiveness (rapid on/off)
             dxdt[13] = (PVO2 - x[13]) / tau_GE
