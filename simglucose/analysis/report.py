@@ -25,7 +25,7 @@ def ensemble_BG(BG, ax=None, plot_var=False, nstd=3):
         ax.fill_between(
             t, up_env, down_env, alpha=0.5, label='+/- {0}*std'.format(nstd))
     for p in BG:
-        ax.plot_date(
+        ax.plot(
             t, BG[p], '-', color='grey', alpha=0.5, lw=0.5, label='_nolegend_')
     ax.plot(t, mean_curve, lw=2, label='Mean Curve')
     ax.xaxis.set_minor_locator(mdates.HourLocator(interval=3))

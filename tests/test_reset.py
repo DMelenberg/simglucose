@@ -14,12 +14,12 @@ class TestReset(unittest.TestCase):
         env = gym.make('simglucose-adult2-v0')
 
         observation0, _ = env.reset(seed=0)
-        start_time0 = env.env.scenario.start_time
-        scenario0 = env.env.scenario.scenario
+        start_time0 = env.unwrapped.scenario.start_time
+        scenario0 = env.unwrapped.scenario.scenario
 
         observation1, _ = env.reset()
-        start_time1 = env.env.scenario.start_time
-        scenario1 = env.env.scenario.scenario
+        start_time1 = env.unwrapped.scenario.start_time
+        scenario1 = env.unwrapped.scenario.scenario
 
         self.assertNotEqual(observation0, observation1)
         self.assertNotEqual(start_time0, start_time1)
@@ -29,20 +29,20 @@ class TestReset(unittest.TestCase):
         env = gym.make('simglucose-adult2-v0')
 
         observation0, _ = env.reset(seed=0)
-        start_time0 = env.env.scenario.start_time
-        scenario0 = env.env.scenario.scenario
+        start_time0 = env.unwrapped.scenario.start_time
+        scenario0 = env.unwrapped.scenario.scenario
 
         observation1, _ = env.reset()
-        start_time1 = env.env.scenario.start_time
-        scenario1 = env.env.scenario.scenario
-        
+        start_time1 = env.unwrapped.scenario.start_time
+        scenario1 = env.unwrapped.scenario.scenario
+
         observation2, _ = env.reset(seed=0)
-        start_time2 = env.env.scenario.start_time
-        scenario2 = env.env.scenario.scenario
+        start_time2 = env.unwrapped.scenario.start_time
+        scenario2 = env.unwrapped.scenario.scenario
 
         observation3, _ = env.reset()
-        start_time3 = env.env.scenario.start_time
-        scenario3 = env.env.scenario.scenario
+        start_time3 = env.unwrapped.scenario.start_time
+        scenario3 = env.unwrapped.scenario.scenario
 
         self.assertEqual(observation0, observation2)
         self.assertEqual(observation1, observation3)
@@ -57,20 +57,20 @@ class TestReset(unittest.TestCase):
         env = gym.make('simglucose-adult2-v0')
 
         observation0, _ = env.reset(seed=0)
-        start_time0 = env.env.scenario.start_time
-        scenario0 = env.env.scenario.scenario
+        start_time0 = env.unwrapped.scenario.start_time
+        scenario0 = env.unwrapped.scenario.scenario
 
         observation1, _ = env.reset()
-        start_time1 = env.env.scenario.start_time
-        scenario1 = env.env.scenario.scenario
-        
+        start_time1 = env.unwrapped.scenario.start_time
+        scenario1 = env.unwrapped.scenario.scenario
+
         observation2, _ = env.reset(seed=1)
-        start_time2 = env.env.scenario.start_time
-        scenario2 = env.env.scenario.scenario
+        start_time2 = env.unwrapped.scenario.start_time
+        scenario2 = env.unwrapped.scenario.scenario
 
         observation3, _ = env.reset()
-        start_time3 = env.env.scenario.start_time
-        scenario3 = env.env.scenario.scenario
+        start_time3 = env.unwrapped.scenario.start_time
+        scenario3 = env.unwrapped.scenario.scenario
 
         self.assertNotEqual(observation0, observation2)
         self.assertNotEqual(observation1, observation3)
