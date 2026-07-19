@@ -31,7 +31,11 @@ integrates from t=step-1 to t=step, returning obs at t=step = bgs[step]).
 
 import numpy as np
 import pytest
-import torch
+
+# torch is an optional dependency. Skip the entire module (rather than
+# erroring at collection) when it is not installed, so the default test run
+# `pytest` works on a base install without torch.
+torch = pytest.importorskip("torch")
 
 from simglucose.patient.t1dpatient import T1DPatient
 from simglucose.patient.t1dpatient import Action as ScipyAction
